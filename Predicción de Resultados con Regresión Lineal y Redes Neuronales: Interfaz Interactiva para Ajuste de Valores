@@ -1,0 +1,129 @@
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+from sklearn.linear_model import LinearRegression
+
+# Función que entrena la red neuronal y genera las gráficas
+def train_and_plot(weeks, real_values):
+    # Generar datos de ejemplo para X
+    X = np.array([i for i in range(1, weeks + 1)], dtype=float).reshape(-1, 1)
+    Y = np.array(real_values, dtype=float)
+
+    # Crear y entrenar la regresión lineal
+    lin_reg = LinearRegression()
+    lin_reg.fit(X, Y)
+    lin_predictions = lin_reg.predict(X)
+
+    # Crear el modelo de la red neuronal
+    model = tf.keras.Sequential([
+        tf.keras.layers.Dense(units=10, input_shape=[1], activation='relu'),
+        tf.keras.layers.Dense(units=1)
+    ])
+
+    # Compilar el modelo
+    model.compile(optimizer='adam', loss='mean_squared_error')
+
+    # Entrenar el modelo
+    history = model.fit(X, Y, epochs=500, verbose=0)
+
+    # Realizar predicciones de la red neuronal
+    nn_predictions = model.predict(X)
+
+    # Mostrar resultados en ventana emergente
+    show_results_and_adjust(nn_predictions[-1][0], lin_predictions[-1], weeks, real_values, model, lin_reg)
+
+    # Graficar los resultados (predicciones vs valores reales)
+    plt.figure(figsize=(10, 6))
+    plt.plot(X, Y, 'b', label="Valores reales")  # Línea azul para valores reales
+    plt.plot(X, lin_predictions, 'g--', label="Regresión Lineal")  # Línea verde para regresión lineal
+    plt.plot(X, nn_predictions, 'r', label="Predicciones de la Red Neuronal")  # Línea roja para predicciones
+    plt.xlabel('Número de semanas')
+    plt.ylabel('Resultados')
+    plt.title('Comparación entre resultados reales, regresión lineal y red neuronal')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Graficar la pérdida durante el entrenamiento de la red neuronal
+    plt.figure(figsize=(10, 6))
+    plt.plot(history.history['loss'])
+    plt.title('Pérdida del modelo durante el entrenamiento')
+    plt.xlabel('Épocas')
+    plt.ylabel('Pérdida')
+    plt.grid(True)
+    plt.show()
+
+# Función para mostrar los resultados y pedir ajuste
+def show_results_and_adjust(nn_result, lin_result, weeks, real_values, model, lin_reg):
+    root = tk.Tk()
+    root.withdraw()  # Ocultar ventana principal
+
+    while True:
+        # Mostrar los resultados actuales en un cuadro de diálogo
+        messagebox.showinfo("Resultados",
+                            f"Tu resultado posible con mi red neuronal fue: {nn_result}\n"
+                            f"El resultado con la regresión lineal fue: {lin_result}")
+        
+        # Preguntar cuál fue el valor real
+        real_value = simpledialog.askfloat("Valor Real", f"¿Cuál fue tu resultado real para la semana {weeks}?")
+
+        if real_value is None:
+            break  # Salir si no se ingresa valor real
+
+        # Agregar el nuevo valor real a la lista
+        real_values[-1] = real_value  # Reemplazar el valor anterior por el ajustado
+
+        # Comparar con las predicciones actuales
+        if np.isclose(real_value, nn_result, atol=1e-2):
+            messagebox.showinfo("Ajuste Completo", "¡El valor de la red neuronal coincide con el valor real!")
+            break
+        elif np.isclose(real_value, lin_result, atol=1e-2):
+            messagebox.showinfo("Ajuste Completo", "¡El valor de la regresión lineal coincide con el valor real!")
+            break
+        else:
+            # Si no coincide, recalcular los modelos con los nuevos valores
+            train_and_recalculate(weeks, real_values, model, lin_reg)
+
+# Función para recalcular los valores ajustados
+def train_and_recalculate(weeks, real_values, model, lin_reg):
+    X = np.array([i for i in range(1, weeks + 1)], dtype=float).reshape(-1, 1)
+    Y = np.array(real_values, dtype=float)
+
+    # Reentrenar la regresión lineal
+    lin_reg.fit(X, Y)
+    lin_predictions = lin_reg.predict(X)
+
+    # Reentrenar la red neuronal
+    model.fit(X, Y, epochs=500, verbose=0)
+    nn_predictions = model.predict(X)
+
+    # Mostrar resultados nuevamente para ajuste
+    show_results_and_adjust(nn_predictions[-1][0], lin_predictions[-1], weeks, real_values, model, lin_reg)
+
+# Función para obtener el número de semanas de la interfaz Tkinter
+def get_weeks_input():
+    # Crear la ventana principal
+    root = tk.Tk()
+    root.withdraw()  # Ocultar la ventana principal
+
+    # Preguntar cuántas semanas
+    weeks = simpledialog.askinteger("Número de semanas", "¿Cuántas semanas deseas usar?", minvalue=1)
+
+    if weeks:
+        global real_values
+        real_values = []
+        
+        # Pedir los valores reales para cada semana
+        for week in range(1, weeks + 1):
+            value = simpledialog.askfloat("Valor Real", f"Ingrese el valor real para la semana {week}:")
+            if value is not None:
+                real_values.append(value)
+
+        if len(real_values) == weeks:
+            train_and_plot(weeks, real_values)  # Entrenar y graficar
+
+# Iniciar el programa con la interfaz de Tkinter
+if __name__ == "__main__":
+    get_weeks_input()
